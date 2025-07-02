@@ -6,4 +6,4 @@ Pull data on-demand. Data are organized by quality control (QC) level:
 
 **Disclaimer: L2 does NOT imply all data are "good"! Data QC is a spectrum, all users are responsible for understanding the data quality needed for their use-case!**
 
-If you want to directly download L1 datasets, please visit the ![data_prep L1 folder]("https://github.com/MCRLdata-Sandbox/data_prep/tree/main/data/outputs/L1")
+If you want to directly download L1 datasets, please visit the [data_prep L1 folder](https://github.com/MCRLdata-Sandbox/data_prep/tree/main/data/outputs/L1)
