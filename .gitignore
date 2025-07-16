@@ -49,3 +49,4 @@ po/*~
 rsconnect/
 
 *.DS_Store
+scripts/x_pull_recent_s3_data.R
