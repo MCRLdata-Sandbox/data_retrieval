@@ -1,0 +1,178 @@
+---
+title: "L1 workup for Noelani"
+author: "PR"
+date: "2025-08-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F,
+                      warning = F,
+                      message = F)
+```
+
+### Purpose
+
+Pull MCRLdata for Dec 2023 to present for water temperature, salinity and tidal stage. In terms of gaps, there is interest in seasonal trends, potentially as daily averages. I'll start with pulling time-series and looking at them raw, then, based on the gaps, try to find ways to explore seasonality via DOY
+
+```{r setup env}
+
+## Set up environment
+library(devtools)
+source("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/scripts/0_setup.R")
+
+## ggplot theme
+theme_set(theme_bw())
+
+## Read in datasets
+tide <- read_csv("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/data/outputs/L1/250515_tidegauge_L1.csv") 
+
+ctd <- read_csv("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/data/outputs/L1/250815_ctd_water_temp_salinity_L1.csv") 
+
+df <- full_join(tide, ctd, by = "time_pst") %>% 
+  assign_season() %>% 
+  filter(time_pst > "2023-12-01")
+
+df_all <- full_join(tide, ctd, by = "time_pst") %>% 
+  assign_season() 
+
+```
+
+### L1 time-series {.tabset}
+
+Without any data manipulation, here's what we're looking at in terms of time-series
+
+#### Tidal stage
+
+```{r}
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line()
+```
+
+#### Water temps
+
+```{r}
+ggplot(df, aes(time_pst, temp_deg_c)) + 
+  geom_line()
+```
+
+#### Salinity
+
+```{r}
+ggplot(df, aes(time_pst, salinity_psu_clean)) + 
+  geom_line()
+```
+
+### 
+
+### Daily values {.tabset}
+
+Those time-series are pretty hard to look at and learn anything, particularly for tides. Let's do daily averages and ranges
+
+#### Tidal stage
+
+```{r}
+
+daily_plot <- function(var){
+  
+  df %>% 
+    ungroup() %>% 
+    group_by(date) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(date)) + 
+    geom_errorbar(aes(ymin = lower, ymax = upper), color = "gray") + 
+    geom_path(aes(y = mean), color = "black")
+}
+
+doy_plot <- function(var){
+    df %>% 
+    ungroup() %>% 
+    group_by(doy) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(doy)) + 
+    geom_errorbar(aes(ymin = lower, ymax = upper), color = "gray") + 
+    geom_smooth(aes(y = mean), se = F, color = "black")
+}
+
+doy_plot(water_level_m_navd88)
+```
+
+#### Water temps
+
+```{r}
+
+doy_plot(temp_deg_c)
+
+```
+
+#### Salinity
+
+```{r}
+doy_plot(salinity_psu_clean)
+```
+
+### 
+
+### Monthly plots {.tabset}
+
+I don't really like these plots, and my interpretation is understanding seasonality might be more useful. Lets try that instead. Since there's a balance between too simple and too complex, let's look at monthly, but use a richer dataset based on the full record we have instead of just from 2023
+
+#### Tidal stage
+
+This is still a very boring plot...
+
+```{r}
+## water_level_m_navd88
+
+monthly_plot <- function(var, ylab){
+    df_all %>% 
+    ungroup() %>% 
+    group_by(month_num) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(month_num)) + 
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = "gray", alpha = 0.2) + 
+    geom_smooth(aes(y = mean), se = F, span = 0.4, color = "black", lwd = 0.4) + 
+    geom_point(aes(y = mean), color = "white", size = 4.5) +
+    geom_point(aes(y = mean), color = "black", size = 3) + 
+    labs(x = "Month of Year", y = ylab)
+}
+
+monthly_plot(water_level_m_navd88, "Water level (m NAVD88)")
+
+```
+
+#### Water temps
+
+```{r}
+## temp_deg_c
+
+monthly_plot(temp_deg_c, "Water Temperature (C)")
+
+```
+
+#### Salinity
+
+```{r}
+## salinity_psu_clean
+
+monthly_plot(salinity_psu_clean, "Salinity (PSU)")
+
+```
+
+### 
+
+### What's next?
+
+These are the visualizations I thought of to get our conversation started. If you're looking for something different, please let me know! Things should be fully customizable. As a couple additional thoughts, let me know if anything in any of these is of interest and we can replicate / incorporate:
+
+-   <https://github.com/MCRLdata-Sandbox/data_sandbox/blob/main/scripts/3_sequim_bay_seasonality.md>
+-   <https://github.com/MCRLdata-Sandbox/data_sandbox/blob/main/scripts/5_natural_variability_envelopes.md>

@@ -3,11 +3,16 @@
 ## interface (CLI). This requires some work, and you must get read access to the
 ## MCRLdata pipeline. Please note that all interactions with AWS in this manner
 ## cost something, so should be used either sparingly or with a WPN.
-
+##
 ## IMPORTANT - read above! This script will NOT work unless 1) you have authorized
 ## access to mcrl_data on AWS, 2) you have successfully set up SSO, and 3) you
 ## are signed in via CLI with proper credentials!
-
+##
+## 2025-07-01
+## Peter Regier
+##
+# ########### #
+# ########### #
 ## Start off clean
 rm(list = ls())
 
@@ -101,9 +106,6 @@ inspect_file_metadata <- function(bucket_name, file_keys) {
   return(result_tibble)
 }
 
-## Test
-# inspect_file_metadata(my_bucket, recent_files[[1]])
-
 file_metadata <- inspect_file_metadata(my_bucket, recent_files)
 
 # Function to read a single CSV file from S3
@@ -123,7 +125,6 @@ read_s3_csv <- function(file_key) {
     return(NULL)
   })
 }
-
 
 pull_data_by_header <- function(col_to_find){
   
