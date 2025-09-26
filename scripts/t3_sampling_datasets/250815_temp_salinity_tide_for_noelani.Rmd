@@ -1,0 +1,323 @@
+---
+title: "L1 workup for Noelani"
+author: "PR"
+date: "2025-08-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F,
+                      warning = F,
+                      message = F)
+```
+
+### Purpose
+
+Pull MCRLdata for Dec 2023 to present for water temperature, salinity and tidal stage. In terms of gaps, there is interest in seasonal trends, potentially as daily averages. I'll start with pulling time-series and looking at them raw, then, based on the gaps, try to find ways to explore seasonality via DOY
+
+```{r setup env}
+
+## Set up environment
+library(devtools)
+source("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/scripts/0_setup.R")
+
+p_load(ggprepel)
+
+## ggplot theme
+theme_set(theme_bw())
+
+## Read in datasets
+tide <- read_csv("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/data/outputs/L1/250515_tidegauge_L1.csv") 
+
+ctd <- read_csv("https://raw.githubusercontent.com/MCRLdata-Sandbox/data_prep/refs/heads/main/data/outputs/L1/250815_ctd_water_temp_salinity_L1.csv") 
+
+df <- full_join(tide, ctd, by = "time_pst") %>% 
+  assign_season() %>% 
+  filter(time_pst > "2023-12-01")
+
+df_all <- full_join(tide, ctd, by = "time_pst") %>% 
+  assign_season() 
+
+```
+
+### L1 time-series {.tabset}
+
+Without any data manipulation, here's what we're looking at in terms of time-series
+
+#### Tidal stage
+
+```{r}
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line()
+```
+
+#### Water temps
+
+```{r}
+ggplot(df, aes(time_pst, temp_deg_c)) + 
+  geom_line()
+```
+
+#### Salinity
+
+```{r}
+ggplot(df, aes(time_pst, salinity_psu_clean)) + 
+  geom_line()
+```
+
+### 
+
+### Daily values {.tabset}
+
+Those time-series are pretty hard to look at and learn anything, particularly for tides. Let's do daily averages and ranges
+
+#### Tidal stage
+
+```{r}
+
+daily_plot <- function(var){
+  
+  df %>% 
+    ungroup() %>% 
+    group_by(date) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(date)) + 
+    geom_errorbar(aes(ymin = lower, ymax = upper), color = "gray") + 
+    geom_path(aes(y = mean), color = "black")
+}
+
+doy_plot <- function(var){
+    df %>% 
+    ungroup() %>% 
+    group_by(doy) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(doy)) + 
+    geom_errorbar(aes(ymin = lower, ymax = upper), color = "gray") + 
+    geom_smooth(aes(y = mean), se = F, color = "black")
+}
+
+doy_plot(water_level_m_navd88)
+```
+
+#### Water temps
+
+```{r}
+
+doy_plot(temp_deg_c)
+
+```
+
+#### Salinity
+
+```{r}
+doy_plot(salinity_psu_clean)
+```
+
+### 
+
+
+
+### Monthly plots {.tabset}
+
+I don't really like these plots, and my interpretation is understanding seasonality might be more useful. Lets try that instead. Since there's a balance between too simple and too complex, let's look at monthly, but use a richer dataset based on the full record we have instead of just from 2023
+
+#### Tidal stage
+
+This is still a very boring plot...
+
+```{r}
+## water_level_m_navd88
+
+monthly_plot <- function(var, ylab){
+    df_all %>% 
+    ungroup() %>% 
+    group_by(month_num) %>% 
+    summarize(mean = mean({{var}}, na.rm = T),
+              sd = sd({{var}}, na.rm = T)) %>% 
+    mutate(upper = mean + sd, 
+           lower = mean - sd) %>% 
+    ggplot(aes(month_num)) + 
+    geom_ribbon(aes(ymin = lower, ymax = upper), fill = "gray", alpha = 0.2) + 
+    geom_smooth(aes(y = mean), se = F, span = 0.4, color = "black", lwd = 0.4) + 
+    geom_point(aes(y = mean), color = "white", size = 4.5) +
+    geom_point(aes(y = mean), color = "black", size = 3) + 
+    labs(x = "Month of Year", y = ylab)
+}
+
+monthly_plot(water_level_m_navd88, "Water level (m NAVD88)")
+
+```
+
+#### Water temps
+
+This is less boring
+
+```{r}
+## temp_deg_c
+
+monthly_plot(temp_deg_c, "Water Temperature (C)")
+
+```
+
+#### Salinity
+
+```{r}
+## salinity_psu_clean
+
+monthly_plot(salinity_psu_clean, "Salinity (PSU)")
+
+```
+
+### 
+
+
+
+### A couple unrelated (but likely related) thoughts {.tabset}
+
+Scott has been asking about overlaying sampling points on time-series, so I wanted to include that. One option is just putting points on raw time-series: 
+
+
+#### Tidal stage (raw)
+
+Here are sampling dates, set to noon, marked as points. I don't love it. 
+
+```{r}
+sampling_dates <- read_csv("/Users/regi350/Downloads/250815_noelani_sampling_dates.csv") %>% 
+  mutate(sampling_date = parsedate::parse_date(sampling_date)) %>% 
+  mutate(sampling_datetime = round_date(sampling_date + sampling_time, "5 min"))
+  
+
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line(color = "gray") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime))
+```
+
+#### Tidal stage (mark above)
+
+```{r}
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line(color = "gray") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             aes(y = 3), alpha = 0.7, size = 3, fill = "blue", pch = 25) + 
+  geom_vline(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             aes(xintercept = time_pst), linetype = "dashed")
+```
+
+#### Tidal stage (mark above and clean up)
+
+```{r}
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line(color = "gray90") + 
+  geom_segment(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+               aes(y = water_level_m_navd88, yend = 3), linetype = "dashed") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             color = "gray20") + 
+  ggrepel::geom_label_repel(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             aes(label = round(water_level_m_navd88, 1)), 
+             nudge_y = -0.5) + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             aes(y = 3), alpha = 0.7, size = 3, fill = "blue", pch = 25) + 
+  labs(x = "", y = "Water level (m NAVD88)")
+  
+```
+
+#### Maybe a little simpler is better
+
+```{r}
+ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line(color = "gray90") + 
+  geom_segment(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+               aes(y = water_level_m_navd88, yend = 3), linetype = "dashed") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             color = "gray20") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_date), 
+             aes(y = 3), alpha = 0.7, size = 3, fill = "blue", pch = 25) + 
+  labs(x = "", y = "Water level (m NAVD88)")
+```
+
+#### Tidal stage - adding times from Noelani
+
+```{r}
+p1 <- ggplot(df, aes(time_pst, water_level_m_navd88)) + 
+  geom_line(color = "lightblue", alpha = 0.9) + 
+  geom_segment(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+               aes(y = water_level_m_navd88, yend = 3), linetype = "dashed") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             color = "gray20") + 
+  ggrepel::geom_label_repel(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             aes(label = round(water_level_m_navd88, 1)), 
+             nudge_y = -0.5) + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             aes(y = 3), alpha = 0.6, size = 3, fill = "blue", pch = 25) + 
+  labs(x = "", y = "Water level (m NAVD88)")
+
+p1
+ggsave("/Users/regi350/Library/CloudStorage/OneDrive-PNNL/Documents/GitHub/MCRLdata-Sandbox/data_retrieval/scripts/x_noelani_tides/tidal_plot.png", width = 7, height = 3.5)
+
+p2 <- ggplot(df, aes(water_level_m_navd88)) + 
+  geom_density(color = "lightblue", fill = "lightblue", alpha = 0.5) + 
+  geom_density(data = df %>% 
+  filter(time_pst %in% sampling_dates$sampling_datetime), 
+  color = "gray20", fill = "gray20", alpha = 0.3) + 
+  labs(x = "Water level", y = "")
+
+plot_grid(p1, p2, nrow = 1, rel_widths = c(1, 0.3))
+ggsave("/Users/regi350/Library/CloudStorage/OneDrive-PNNL/Documents/GitHub/MCRLdata-Sandbox/data_retrieval/scripts/x_noelani_tides/tidal_plot_w_density.png", width = 9, height = 3.5)
+```
+
+
+###
+
+### Make the same plots for temp and salinity
+
+```{r}
+
+make_plots <- function(var, arrow_height, ylab, plot_name){
+  p1 <- ggplot(df, aes(time_pst, {{var}})) + 
+  geom_line(color = "lightblue", alpha = 0.9) + 
+  geom_segment(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+               aes(y = {{var}}, yend = arrow_height), linetype = "dashed") + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             color = "gray20") + 
+  ggrepel::geom_label_repel(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             aes(label = round({{var}}, 1)), 
+             nudge_y = -0.5) + 
+  geom_point(data = df %>% filter(time_pst %in% sampling_dates$sampling_datetime), 
+             aes(y = arrow_height), alpha = 0.6, size = 3, fill = "blue", pch = 25) + 
+  labs(x = "", y = ylab)
+
+ggsave(paste0("/Users/regi350/Library/CloudStorage/OneDrive-PNNL/Documents/GitHub/MCRLdata-Sandbox/data_retrieval/scripts/x_noelani_tides/", plot_name, "_plot.png"), width = 7, height = 3.5)
+}
+
+make_plots(temp_deg_c, 20, "Temp (C)", "temp")
+
+make_plots(salinity_psu_clean, 35, "Salinity (PSU)", "sal")
+
+```
+
+
+#### Remake all three as DOY
+
+
+
+
+
+
+
+### What's next?
+
+These are the visualizations I thought of to get our conversation started. If you're looking for something different, please let me know! Things should be fully customizable. As a couple additional thoughts, let me know if anything in any of these is of interest and we can replicate / incorporate:
+
+-   <https://github.com/MCRLdata-Sandbox/data_sandbox/blob/main/scripts/3_sequim_bay_seasonality.md>
+-   <https://github.com/MCRLdata-Sandbox/data_sandbox/blob/main/scripts/5_natural_variability_envelopes.md>
+
+
+
+
+
