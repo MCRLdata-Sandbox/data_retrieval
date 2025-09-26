@@ -168,7 +168,7 @@ plot_grid(ggplot(wl_filled, aes(x = time_pst)) +
     geom_line(aes(y = salinity_psu_clean_filled), color = "blue", alpha = 0.7) + 
     geom_line(aes(y = salinity_psu_clean), color = "gray"),
   ncol = 1) 
-ggsave("scripts/x_noelani_tides/rf_gapfilling.png", width = 6, height = 9)
+ggsave("scripts/t3_sampling_datasets/rf_gapfilling.png", width = 6, height = 9)
 
 
 # 7. Bring in sampling datetimes -----------------------------------------------
@@ -202,8 +202,33 @@ plot_grid(make_plot(water_level_filled, "Water level (m NAVD88)", 3),
           make_plot(temp_deg_c_filled, "Water temp (C)", 19), 
           make_plot(salinity_psu_clean_filled, "Salinity (PSU)", 33), 
           ncol = 1)
-ggsave("scripts/x_noelani_tides/sampling_plots.png", width = 8, height = 8)
+ggsave("scripts/t3_sampling_datasets/sampling_plots.png", width = 8, height = 8, dpi = 300)
+ggsave("scripts/t3_sampling_datasets/sampling_plots.jpg", width = 8, height = 8, dpi = 300)
 
+# 9. Make no-label plots -------------------------------------------------------
+
+make_plot_no_labels <- function(var, ylab, offset){
+  ggplot(df1_filled, aes(time_pst, {{var}})) + 
+    geom_line(color = "gray90") + 
+    geom_segment(data = df1_filled %>% filter(time_pst %in% sampling_dates$sampling_date), 
+                 aes(y = {{var}}, yend = offset), linetype = "dashed") + 
+    geom_point(data = df1_filled %>% filter(time_pst %in% sampling_dates$sampling_date), 
+               color = "gray20") + 
+    #ggrepel::geom_label_repel(data = df1_filled %>% filter(time_pst %in% sampling_dates$sampling_date), 
+    #                          aes(label = round({{var}}, 1)), 
+    #                          max.overlaps = 13,
+    #                          nudge_y = -0.5) + 
+    geom_point(data = df1_filled %>% filter(time_pst %in% sampling_dates$sampling_date), 
+               aes(y = offset), alpha = 0.7, size = 3, fill = "blue", pch = 25) + 
+    labs(x = "", y = ylab)
+}
+
+plot_grid(make_plot_no_labels(water_level_filled, "Water level (m NAVD88)", 3), 
+          make_plot_no_labels(temp_deg_c_filled, "Water temp (C)", 19), 
+          make_plot_no_labels(salinity_psu_clean_filled, "Salinity (PSU)", 33), 
+          ncol = 1)
+ggsave("scripts/t3_sampling_datasets/sampling_plots_no_labels.png", width = 8, height = 8, dpi = 300)
+ggsave("scripts/t3_sampling_datasets/sampling_plots_no_labels.jpg", width = 8, height = 8, dpi = 300)
 
 ## 50k before forcing ctd to 15 min at top of script
 ## 100k after forcing ctd to 15 min at top of script??
